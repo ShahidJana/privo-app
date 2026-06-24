@@ -22,6 +22,17 @@ export class NotFoundError extends AppError {
 }
 
 /**
+ * The operation conflicts with current state (e.g. deleting a person who still
+ * has active debts). Caller should surface an actionable message.
+ */
+export class ConflictError extends AppError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
+/**
  * Input failed schema validation before reaching the DB (Challenges S3).
  * `issues` carries the structured validation failures (e.g. Zod issues).
  */

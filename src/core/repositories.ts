@@ -11,9 +11,11 @@ import { newId } from '@lib/uuid';
 import { now } from '@lib/date';
 import { createVaultRepo, type VaultRepo } from '@features/vault/VaultRepo';
 import { DocumentsRepo } from '@features/documents/DocumentsRepo';
+import { UdhaarRepo } from '@features/udhaar/UdhaarRepo';
 
 let vaultRepo: VaultRepo | null = null;
 let documentsRepo: DocumentsRepo | null = null;
+let udhaarRepo: UdhaarRepo | null = null;
 
 export async function getVaultRepo(): Promise<VaultRepo> {
   if (!vaultRepo) {
@@ -35,8 +37,17 @@ export async function getDocumentsRepo(): Promise<DocumentsRepo> {
   return documentsRepo;
 }
 
+export async function getUdhaarRepo(): Promise<UdhaarRepo> {
+  if (!udhaarRepo) {
+    const db = await getDatabase();
+    udhaarRepo = new UdhaarRepo(db, { now, newId });
+  }
+  return udhaarRepo;
+}
+
 /** Test hook — clears memoized repos so a fresh DB can be injected. */
 export function __resetRepositories(): void {
   vaultRepo = null;
   documentsRepo = null;
+  udhaarRepo = null;
 }

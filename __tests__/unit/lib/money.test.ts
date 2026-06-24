@@ -7,7 +7,9 @@ import {
   inputToPaisa,
   computeStatus,
   calculateNetBalance,
+  netBalanceByPerson,
   type BalanceEntry,
+  type PersonBalanceEntry,
 } from '@lib/money';
 
 describe('paisaToDisplay', () => {
@@ -79,6 +81,43 @@ describe('calculateNetBalance', () => {
           const result = calculateNetBalance(entries);
           expect(Number.isInteger(result)).toBe(true);
           expect(Number.isFinite(result)).toBe(true);
+        },
+      ),
+    );
+  });
+});
+
+describe('netBalanceByPerson', () => {
+  it('nets multiple debts per person', () => {
+    const entries: PersonBalanceEntry[] = [
+      { personId: 'ali', amount: 100000, direction: 'lena', totalPaid: 0 },
+      { personId: 'ali', amount: 30000, direction: 'dena', totalPaid: 0 },
+      { personId: 'sara', amount: 5000, direction: 'dena', totalPaid: 2000 },
+    ];
+    expect(netBalanceByPerson(entries)).toEqual([
+      { personId: 'ali', net: 70000 }, // +100000 - 30000
+      { personId: 'sara', net: -3000 }, // -(5000 - 2000)
+    ]);
+  });
+
+  it('property: per-person nets sum to the overall net, all integers', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            personId: fc.constantFrom('a', 'b', 'c'),
+            amount: fc.integer({ min: 1, max: 10_000_000 }),
+            direction: fc.constantFrom<'lena' | 'dena'>('lena', 'dena'),
+            totalPaid: fc.integer({ min: 0, max: 10_000_000 }),
+          }),
+        ),
+        entries => {
+          const perPerson = netBalanceByPerson(entries);
+          const sumOfNets = perPerson.reduce((s, p) => s + p.net, 0);
+          expect(sumOfNets).toBe(calculateNetBalance(entries));
+          for (const p of perPerson) {
+            expect(Number.isInteger(p.net)).toBe(true);
+          }
         },
       ),
     );

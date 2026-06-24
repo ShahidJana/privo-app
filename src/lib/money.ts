@@ -60,3 +60,29 @@ export function calculateNetBalance(entries: readonly BalanceEntry[]): number {
     return entry.direction === 'lena' ? net + remaining : net - remaining;
   }, 0);
 }
+
+export interface PersonBalanceEntry extends BalanceEntry {
+  personId: string;
+}
+
+export interface PersonNetBalance {
+  personId: string;
+  /** Net paisa for this person; positive = they owe you, negative = you owe them. */
+  net: number;
+}
+
+/**
+ * Net balance grouped per person. Order follows first appearance of each
+ * personId. All-integer paisa, so no rounding error across any mix of debts.
+ */
+export function netBalanceByPerson(
+  entries: readonly PersonBalanceEntry[],
+): PersonNetBalance[] {
+  const nets = new Map<string, number>();
+  for (const entry of entries) {
+    const remaining = entry.amount - entry.totalPaid;
+    const delta = entry.direction === 'lena' ? remaining : -remaining;
+    nets.set(entry.personId, (nets.get(entry.personId) ?? 0) + delta);
+  }
+  return Array.from(nets, ([personId, net]) => ({ personId, net }));
+}
