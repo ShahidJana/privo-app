@@ -17,3 +17,17 @@ export type {
   RevealedSecret,
   VaultListFilter,
 } from './vault.types';
+export {
+  vaultKeys,
+  useVaultList,
+  useVaultEntry,
+  useCreateVault,
+  useUpdateVault,
+  useDeleteVault,
+  type UpdateVaultArgs,
+} from './useVault';
+export {
+  useRevealSecret,
+  DEFAULT_AUTO_HIDE_MS,
+  type UseRevealSecretResult,
+} from './useRevealSecret';

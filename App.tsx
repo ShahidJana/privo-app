@@ -11,6 +11,8 @@ import {
   DefaultTheme,
   NavigationContainer,
 } from '@react-navigation/native';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@lib/queryClient';
 import { RootNavigator } from '@/app/navigation/RootNavigator';
 
 function App(): React.JSX.Element {
@@ -18,12 +20,14 @@ function App(): React.JSX.Element {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
-          <RootNavigator />
-        </NavigationContainer>
-      </SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+          <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
+            <RootNavigator />
+          </NavigationContainer>
+        </SafeAreaProvider>
+      </QueryClientProvider>
     </GestureHandlerRootView>
   );
 }
