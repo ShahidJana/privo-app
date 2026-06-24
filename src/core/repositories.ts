@@ -6,9 +6,14 @@
  * As more repos land (documents, udhaar), add their accessors here.
  */
 import { getDatabase } from '@core/db';
+import { rnfsFileStorage } from '@core/files/fileStorage';
+import { newId } from '@lib/uuid';
+import { now } from '@lib/date';
 import { createVaultRepo, type VaultRepo } from '@features/vault/VaultRepo';
+import { DocumentsRepo } from '@features/documents/DocumentsRepo';
 
 let vaultRepo: VaultRepo | null = null;
+let documentsRepo: DocumentsRepo | null = null;
 
 export async function getVaultRepo(): Promise<VaultRepo> {
   if (!vaultRepo) {
@@ -18,7 +23,20 @@ export async function getVaultRepo(): Promise<VaultRepo> {
   return vaultRepo;
 }
 
+export async function getDocumentsRepo(): Promise<DocumentsRepo> {
+  if (!documentsRepo) {
+    const db = await getDatabase();
+    documentsRepo = new DocumentsRepo(db, {
+      fileStorage: rnfsFileStorage,
+      now,
+      newId,
+    });
+  }
+  return documentsRepo;
+}
+
 /** Test hook — clears memoized repos so a fresh DB can be injected. */
 export function __resetRepositories(): void {
   vaultRepo = null;
+  documentsRepo = null;
 }
