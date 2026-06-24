@@ -1,0 +1,19 @@
+diff --git a/node_modules/@op-engineering/op-sqlite/android/build.gradle b/node_modules/@op-engineering/op-sqlite/android/build.gradle
+index 75d1044..7edd628 100644
+--- a/node_modules/@op-engineering/op-sqlite/android/build.gradle
++++ b/node_modules/@op-engineering/op-sqlite/android/build.gradle
+@@ -150,6 +150,11 @@ android {
+ 
+   compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
+ 
++  // Privo: NDK ko RN ke same version (27.1) pe pin karo taaki duplicate NDK na bane.
++  if (rootProject.hasProperty("ndkVersion")) {
++    ndkVersion rootProject.ext.ndkVersion
++  }
++
+   defaultConfig {
+     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
+     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+diff --git a/node_modules/@op-engineering/op-sqlite/android/src/main/jniLibs/x86_64/libsql_experimental.so b/node_modules/@op-engineering/op-sqlite/android/src/main/jniLibs/x86_64/libsql_experimental.so
+index 952ab9d..14240db 100644
+Binary files a/node_modules/@op-engineering/op-sqlite/android/src/main/jniLibs/x86_64/libsql_experimental.so and b/node_modules/@op-engineering/op-sqlite/android/src/main/jniLibs/x86_64/libsql_experimental.so differ
