@@ -1,11 +1,13 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import { HomeScreen } from '@/app/home/HomeScreen';
+import { DashboardScreen } from '@/app/dashboard/DashboardScreen';
+import { DocumentsScreen } from '@/app/documents/DocumentsScreen';
 import { OnboardingSecurityScreen } from '@/app/onboarding/OnboardingSecurityScreen';
 
 export type RootStackParamList = {
   Onboarding: undefined;
   Home: undefined;
+  Documents: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -17,7 +19,8 @@ export function RootNavigator(): React.JSX.Element {
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="Onboarding" component={OnboardingSecurityScreen} />
-      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Home" component={DashboardScreen} />
+      <Stack.Screen name="Documents" component={DocumentsScreen} />
     </Stack.Navigator>
   );
 }

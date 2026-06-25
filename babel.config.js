@@ -1,6 +1,9 @@
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
   plugins: [
+    // zod v4 ships `export * as core from '...'` (export-namespace-from), which
+    // the RN preset doesn't transform on its own — needed for the data layer.
+    '@babel/plugin-transform-export-namespace-from',
     [
       'module-resolver',
       {
