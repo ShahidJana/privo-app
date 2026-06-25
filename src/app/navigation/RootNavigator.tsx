@@ -2,12 +2,16 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { DashboardScreen } from '@/app/dashboard/DashboardScreen';
 import { DocumentsScreen } from '@/app/documents/DocumentsScreen';
+import { UdhaarScreen } from '@/app/udhaar/UdhaarScreen';
+import { VaultScreen } from '@/app/vault/VaultScreen';
 import { OnboardingSecurityScreen } from '@/app/onboarding/OnboardingSecurityScreen';
 
 export type RootStackParamList = {
   Onboarding: undefined;
   Home: undefined;
   Documents: undefined;
+  Udhaar: undefined;
+  Vault: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -21,6 +25,8 @@ export function RootNavigator(): React.JSX.Element {
       <Stack.Screen name="Onboarding" component={OnboardingSecurityScreen} />
       <Stack.Screen name="Home" component={DashboardScreen} />
       <Stack.Screen name="Documents" component={DocumentsScreen} />
+      <Stack.Screen name="Udhaar" component={UdhaarScreen} />
+      <Stack.Screen name="Vault" component={VaultScreen} />
     </Stack.Navigator>
   );
 }

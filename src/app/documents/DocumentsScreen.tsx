@@ -8,10 +8,8 @@
  * module" against a stale bundle.
  */
 import React from 'react';
-import type { StackScreenProps } from '@react-navigation/stack';
 import { logger } from '@lib/logger';
-import type { TabKey } from '@ui/components/BottomNav';
-import type { RootStackParamList } from '@/app/navigation/RootNavigator';
+import { useTabPress } from '@/app/navigation/useTabPress';
 import { DocumentsView, EMPTY_DOCUMENTS } from './DocumentsView';
 import DocumentsData from './DocumentsData';
 
@@ -44,17 +42,8 @@ class DocumentsErrorBoundary extends React.Component<
   }
 }
 
-type Props = StackScreenProps<RootStackParamList, 'Documents'>;
-
-export function DocumentsScreen({ navigation }: Props): React.JSX.Element {
-  const onTabPress = (tab: TabKey): void => {
-    if (tab === 'dashboard') {
-      navigation.navigate('Home');
-    } else if (tab === 'documents') {
-      navigation.navigate('Documents');
-    }
-    // udhaar / vault screens are not built yet.
-  };
+export function DocumentsScreen(): React.JSX.Element {
+  const onTabPress = useTabPress();
 
   return (
     <DocumentsErrorBoundary
