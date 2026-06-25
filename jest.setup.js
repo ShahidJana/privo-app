@@ -8,3 +8,6 @@ require('react-native-gesture-handler/jestSetup');
 jest.mock('react-native-reanimated', () =>
   require('react-native-reanimated/mock'),
 );
+
+// Vector icons render a native font; stub to a host component in tests.
+jest.mock('react-native-vector-icons/MaterialIcons', () => 'MaterialIcons');
