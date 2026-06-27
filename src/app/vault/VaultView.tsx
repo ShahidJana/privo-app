@@ -6,7 +6,7 @@
  * Security: this component only ever renders the decrypted secret passed in for
  * the single revealed entry. It never stores or derives plaintext itself.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -20,11 +20,34 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@ui/components/Icon';
 import { BottomNav, type TabKey } from '@ui/components/BottomNav';
+import { FormSheet } from '@ui/components/FormSheet';
+import { TextField } from '@ui/components/TextField';
+import { Button } from '@ui/components/Button';
 import { darkTheme as c } from '@ui/theme/colors';
 import { radius, spacing } from '@ui/theme/spacing';
 import { typography } from '@ui/theme/typography';
 
 const MASK = '••••••••';
+
+/** Category keys; mirror VAULT_CATEGORIES in the feature layer (validated there). */
+export type VaultCategoryKey = 'bank' | 'social' | 'email' | 'app' | 'other';
+
+const CATEGORY_OPTIONS: { key: VaultCategoryKey; label: string; icon: string }[] = [
+  { key: 'bank', label: 'Bank', icon: 'account-balance' },
+  { key: 'social', label: 'Social', icon: 'group' },
+  { key: 'email', label: 'Email', icon: 'alternate-email' },
+  { key: 'app', label: 'App', icon: 'apps' },
+  { key: 'other', label: 'Other', icon: 'vpn-key' },
+];
+
+/** Form payload for a new vault entry (raw strings; Data layer validates/persists). */
+export interface NewVaultInput {
+  title: string;
+  username: string;
+  secret: string;
+  category: VaultCategoryKey;
+  url: string;
+}
 
 export interface VaultCardVM {
   id: string;
@@ -47,13 +70,24 @@ export function VaultView({
   revealingId,
   onToggleReveal,
   onTabPress,
+  onCreateEntry,
+  creating = false,
 }: VaultData & {
   revealedId: string | null;
   revealedSecret: string | null;
   revealingId: string | null;
   onToggleReveal: (id: string) => void;
   onTabPress: (tab: TabKey) => void;
+  onCreateEntry: (input: NewVaultInput) => void;
+  creating?: boolean;
 }): React.JSX.Element {
+  const [formOpen, setFormOpen] = useState(false);
+
+  const submit = (input: NewVaultInput): void => {
+    onCreateEntry(input);
+    setFormOpen(false);
+  };
+
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.headerWrap}>
@@ -85,6 +119,7 @@ export function VaultView({
             />
           </View>
           <Pressable
+            onPress={() => setFormOpen(true)}
             style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
           >
             <Icon name="add" size={20} color={c.onAccent} />
@@ -103,7 +138,7 @@ export function VaultView({
         </View>
 
         {entries.length === 0 ? (
-          <EmptyState />
+          <EmptyState onAdd={() => setFormOpen(true)} />
         ) : (
           <View style={styles.grid}>
             {entries.map(entry => (
@@ -118,13 +153,147 @@ export function VaultView({
                 onToggleReveal={() => onToggleReveal(entry.id)}
               />
             ))}
-            <AddCard />
+            <AddCard onPress={() => setFormOpen(true)} />
           </View>
         )}
       </ScrollView>
 
       <BottomNav active="vault" onTabPress={onTabPress} />
+
+      <VaultForm
+        visible={formOpen}
+        busy={creating}
+        onClose={() => setFormOpen(false)}
+        onSubmit={submit}
+      />
     </View>
+  );
+}
+
+/* -------------------------------- form ---------------------------------- */
+
+function VaultForm({
+  visible,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (input: NewVaultInput) => void;
+}): React.JSX.Element {
+  const [title, setTitle] = useState('');
+  const [username, setUsername] = useState('');
+  const [secret, setSecret] = useState('');
+  const [url, setUrl] = useState('');
+  const [category, setCategory] = useState<VaultCategoryKey>('other');
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [secretError, setSecretError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (visible) {
+      setTitle('');
+      setUsername('');
+      setSecret('');
+      setUrl('');
+      setCategory('other');
+      setTitleError(null);
+      setSecretError(null);
+    }
+  }, [visible]);
+
+  const submit = (): void => {
+    const missingTitle = title.trim().length === 0;
+    const missingSecret = secret.length === 0;
+    if (missingTitle || missingSecret) {
+      setTitleError(missingTitle ? 'Title is required' : null);
+      setSecretError(missingSecret ? 'Secret is required' : null);
+      return;
+    }
+    onSubmit({
+      title: title.trim(),
+      username: username.trim(),
+      secret,
+      category,
+      url: url.trim(),
+    });
+  };
+
+  return (
+    <FormSheet visible={visible} title="New Vault Entry" onClose={onClose}>
+      <TextField
+        label="Title"
+        placeholder="e.g. Meezan Bank"
+        value={title}
+        onChangeText={t => {
+          setTitle(t);
+          if (titleError) {
+            setTitleError(null);
+          }
+        }}
+        error={titleError}
+        autoFocus
+      />
+
+      <View style={styles.categoryRow}>
+        {CATEGORY_OPTIONS.map(opt => {
+          const active = opt.key === category;
+          return (
+            <Pressable
+              key={opt.key}
+              onPress={() => setCategory(opt.key)}
+              style={[styles.categoryChip, active && styles.categoryChipActive]}
+            >
+              <Icon
+                name={opt.icon}
+                size={16}
+                color={active ? c.onAccent : c.textDim}
+              />
+              <Text
+                style={[
+                  styles.categoryChipText,
+                  active && styles.categoryChipTextActive,
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <TextField
+        label="Username / Email (optional)"
+        placeholder="you@example.com"
+        value={username}
+        onChangeText={setUsername}
+        autoCapitalize="none"
+      />
+      <TextField
+        label="Secret / Password"
+        placeholder="Enter the secret to encrypt"
+        value={secret}
+        onChangeText={t => {
+          setSecret(t);
+          if (secretError) {
+            setSecretError(null);
+          }
+        }}
+        error={secretError}
+        secureTextEntry
+        autoCapitalize="none"
+      />
+      <TextField
+        label="URL (optional)"
+        placeholder="https://…"
+        value={url}
+        onChangeText={setUrl}
+        autoCapitalize="none"
+        keyboardType="url"
+      />
+      <Button label="Save Entry" iconName="lock" onPress={submit} busy={busy} />
+    </FormSheet>
   );
 }
 
@@ -199,9 +368,10 @@ function VaultCard({
   );
 }
 
-function AddCard(): React.JSX.Element {
+function AddCard({ onPress }: { onPress: () => void }): React.JSX.Element {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [styles.addCard, pressed && styles.pressed]}
     >
       <View style={styles.addCardIcon}>
@@ -213,7 +383,7 @@ function AddCard(): React.JSX.Element {
   );
 }
 
-function EmptyState(): React.JSX.Element {
+function EmptyState({ onAdd }: { onAdd: () => void }): React.JSX.Element {
   return (
     <View style={styles.empty}>
       <Icon name="enhanced-encryption" size={40} color={c.textDim} />
@@ -221,6 +391,9 @@ function EmptyState(): React.JSX.Element {
       <Text style={styles.emptyDesc}>
         Add your first credential — secrets are encrypted on this device only.
       </Text>
+      <View style={styles.emptyAction}>
+        <Button label="Add Entry" iconName="add" onPress={onAdd} />
+      </View>
     </View>
   );
 }
@@ -393,4 +566,22 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { ...typography.titleSm, color: c.textPrimary, marginTop: spacing.sm },
   emptyDesc: { ...typography.caption, color: c.textDim, textAlign: 'center' },
+  emptyAction: { alignSelf: 'stretch', marginTop: spacing.md },
+
+  // Category selector (form)
+  categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surfaceAlt,
+  },
+  categoryChipActive: { backgroundColor: c.accent, borderColor: c.accent },
+  categoryChipText: { ...typography.labelCaps, fontSize: 11, color: c.textDim },
+  categoryChipTextActive: { color: c.onAccent },
 });

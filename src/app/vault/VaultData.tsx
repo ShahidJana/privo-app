@@ -10,14 +10,14 @@
  */
 import React, { useState } from 'react';
 import { now } from '@lib/date';
-import { useVaultList } from '@features/vault/useVault';
+import { useCreateVault, useVaultList } from '@features/vault/useVault';
 import { useRevealSecret } from '@features/vault/useRevealSecret';
 import type {
   VaultCategory,
   VaultEntry,
 } from '@features/vault/vault.types';
 import type { TabKey } from '@ui/components/BottomNav';
-import { VaultView, type VaultCardVM } from './VaultView';
+import { VaultView, type NewVaultInput, type VaultCardVM } from './VaultView';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -66,7 +66,18 @@ export default function VaultData({
   onTabPress: (tab: TabKey) => void;
 }): React.JSX.Element {
   const entries = useVaultList().data ?? [];
+  const createVault = useCreateVault();
   const { revealed, revealedId, isRevealing, reveal, hide } = useRevealSecret();
+
+  const handleCreateEntry = (input: NewVaultInput): void => {
+    createVault.mutate({
+      title: input.title,
+      username: input.username.length > 0 ? input.username : undefined,
+      secret: input.secret,
+      category: input.category,
+      url: input.url.length > 0 ? input.url : undefined,
+    });
+  };
   // Track which card's reveal is in flight — the hook only exposes `revealedId`
   // once decryption resolves, so we need our own id to show "Decrypting…".
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -91,6 +102,8 @@ export default function VaultData({
       revealingId={isRevealing ? pendingId : null}
       onToggleReveal={onToggleReveal}
       onTabPress={onTabPress}
+      onCreateEntry={handleCreateEntry}
+      creating={createVault.isPending}
     />
   );
 }

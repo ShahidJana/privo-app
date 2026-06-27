@@ -47,7 +47,14 @@ export function DocumentsScreen(): React.JSX.Element {
 
   return (
     <DocumentsErrorBoundary
-      fallback={<DocumentsView {...EMPTY_DOCUMENTS} onTabPress={onTabPress} />}
+      fallback={
+        <DocumentsView
+          {...EMPTY_DOCUMENTS}
+          onTabPress={onTabPress}
+          onPickFile={() => Promise.resolve(null)}
+          onCreate={() => undefined}
+        />
+      }
     >
       <DocumentsData onTabPress={onTabPress} />
     </DocumentsErrorBoundary>

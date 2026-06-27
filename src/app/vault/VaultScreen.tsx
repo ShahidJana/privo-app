@@ -52,6 +52,7 @@ export function VaultScreen(): React.JSX.Element {
           revealingId={null}
           onToggleReveal={() => undefined}
           onTabPress={onTabPress}
+          onCreateEntry={() => undefined}
         />
       }
     >

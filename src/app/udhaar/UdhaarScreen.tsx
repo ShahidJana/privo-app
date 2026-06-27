@@ -50,6 +50,8 @@ export function UdhaarScreen(): React.JSX.Element {
           onTabPress={onTabPress}
           onSelectPerson={() => undefined}
           onBack={() => undefined}
+          onCreatePerson={() => undefined}
+          onCreateEntry={() => undefined}
         />
       }
     >

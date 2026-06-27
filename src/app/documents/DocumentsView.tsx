@@ -17,11 +17,50 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@ui/components/Icon';
 import { BottomNav, type TabKey } from '@ui/components/BottomNav';
+import { FormSheet } from '@ui/components/FormSheet';
+import { TextField } from '@ui/components/TextField';
+import { Button } from '@ui/components/Button';
 import { darkTheme as c } from '@ui/theme/colors';
 import { radius, spacing } from '@ui/theme/spacing';
 import { typography } from '@ui/theme/typography';
+import type { PickedFile } from '@core/files/fileStorage';
+import type { PickSource } from '@core/files/filePicker';
 
 export type Tone = 'ok' | 'danger' | 'normal';
+
+/** Category keys; mirror DOCUMENT_CATEGORIES in the feature layer. */
+export type DocCategoryKey = 'personal' | 'educational';
+
+/** Document type keys; mirror DOCUMENT_TYPES in the feature layer. */
+export type DocTypeKey =
+  | 'cnic'
+  | 'degree'
+  | 'passport'
+  | 'license'
+  | 'birth_cert'
+  | 'other';
+
+const DOC_CATEGORY_OPTIONS: { key: DocCategoryKey; label: string; icon: string }[] = [
+  { key: 'personal', label: 'Personal', icon: 'folder-shared' },
+  { key: 'educational', label: 'Educational', icon: 'school' },
+];
+
+const DOC_TYPE_OPTIONS: { key: DocTypeKey; label: string }[] = [
+  { key: 'cnic', label: 'CNIC' },
+  { key: 'degree', label: 'Degree' },
+  { key: 'passport', label: 'Passport' },
+  { key: 'license', label: 'License' },
+  { key: 'birth_cert', label: 'Birth Cert' },
+  { key: 'other', label: 'Other' },
+];
+
+/** Form payload for a new document (raw strings; Data layer validates/persists). */
+export interface NewDocumentInput {
+  title: string;
+  category: DocCategoryKey;
+  docType: DocTypeKey;
+  expiry: string; // 'YYYY-MM-DD' or '' for lifetime
+}
 
 export interface DocItemVM {
   id: string;
@@ -56,9 +95,31 @@ export function DocumentsView({
   sections,
   totalCount,
   onTabPress,
+  onPickFile,
+  onCreate,
+  creating = false,
 }: DocumentsData & {
   onTabPress: (tab: TabKey) => void;
+  onPickFile: (source: PickSource) => Promise<PickedFile | null>;
+  onCreate: (input: NewDocumentInput, file: PickedFile) => void;
+  creating?: boolean;
 }): React.JSX.Element {
+  const [pickedFile, setPickedFile] = useState<PickedFile | null>(null);
+
+  const startAdd = async (source: PickSource): Promise<void> => {
+    const file = await onPickFile(source);
+    if (file) {
+      setPickedFile(file);
+    }
+  };
+
+  const submit = (input: NewDocumentInput): void => {
+    if (pickedFile) {
+      onCreate(input, pickedFile);
+    }
+    setPickedFile(null);
+  };
+
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.headerWrap}>
@@ -108,9 +169,164 @@ export function DocumentsView({
         <InfoCards />
       </ScrollView>
 
-      <Fab />
+      <Fab onPick={startAdd} />
       <BottomNav active="documents" onTabPress={onTabPress} />
+
+      <DocumentForm
+        file={pickedFile}
+        busy={creating}
+        onClose={() => setPickedFile(null)}
+        onSubmit={submit}
+      />
     </View>
+  );
+}
+
+/* -------------------------------- form ---------------------------------- */
+
+function DocumentForm({
+  file,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  file: PickedFile | null;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (input: NewDocumentInput) => void;
+}): React.JSX.Element {
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState<DocCategoryKey>('personal');
+  const [docType, setDocType] = useState<DocTypeKey>('other');
+  const [expiry, setExpiry] = useState('');
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [expiryError, setExpiryError] = useState<string | null>(null);
+
+  // Seed the title from the picked file name each time a new file arrives.
+  React.useEffect(() => {
+    if (file) {
+      setTitle(file.name ?? '');
+      setCategory('personal');
+      setDocType('other');
+      setExpiry('');
+      setTitleError(null);
+      setExpiryError(null);
+    }
+  }, [file]);
+
+  const submit = (): void => {
+    if (title.trim().length === 0) {
+      setTitleError('Title is required');
+      return;
+    }
+    if (expiry.trim().length > 0 && !/^\d{4}-\d{2}-\d{2}$/.test(expiry.trim())) {
+      setExpiryError('Use format YYYY-MM-DD');
+      return;
+    }
+    onSubmit({
+      title: title.trim(),
+      category,
+      docType,
+      expiry: expiry.trim(),
+    });
+  };
+
+  return (
+    <FormSheet visible={file !== null} title="New Document" onClose={onClose}>
+      {file ? (
+        <View style={styles.filePreview}>
+          <Icon name="insert-drive-file" size={22} color={c.accent} />
+          <Text style={styles.filePreviewText} numberOfLines={1}>
+            {file.name ?? 'Selected file'}
+          </Text>
+        </View>
+      ) : null}
+
+      <TextField
+        label="Title"
+        placeholder="e.g. National ID Card"
+        value={title}
+        onChangeText={t => {
+          setTitle(t);
+          if (titleError) {
+            setTitleError(null);
+          }
+        }}
+        error={titleError}
+        autoFocus
+      />
+
+      <View>
+        <Text style={styles.fieldLabel}>CATEGORY</Text>
+        <View style={styles.chipRow}>
+          {DOC_CATEGORY_OPTIONS.map(opt => (
+            <Chip
+              key={opt.key}
+              label={opt.label}
+              icon={opt.icon}
+              active={opt.key === category}
+              onPress={() => setCategory(opt.key)}
+            />
+          ))}
+        </View>
+      </View>
+
+      <View>
+        <Text style={styles.fieldLabel}>TYPE</Text>
+        <View style={styles.chipRow}>
+          {DOC_TYPE_OPTIONS.map(opt => (
+            <Chip
+              key={opt.key}
+              label={opt.label}
+              active={opt.key === docType}
+              onPress={() => setDocType(opt.key)}
+            />
+          ))}
+        </View>
+      </View>
+
+      <TextField
+        label="Expiry date (optional)"
+        placeholder="YYYY-MM-DD"
+        value={expiry}
+        onChangeText={t => {
+          setExpiry(t);
+          if (expiryError) {
+            setExpiryError(null);
+          }
+        }}
+        error={expiryError}
+        keyboardType="numbers-and-punctuation"
+      />
+
+      <Button label="Save Document" iconName="lock" onPress={submit} busy={busy} />
+    </FormSheet>
+  );
+}
+
+function Chip({
+  label,
+  icon,
+  active,
+  onPress,
+}: {
+  label: string;
+  icon?: string;
+  active: boolean;
+  onPress: () => void;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.chip, active && styles.chipActive]}
+    >
+      {icon ? (
+        <Icon name={icon} size={16} color={active ? c.onAccent : c.textDim} />
+      ) : null}
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -232,15 +448,32 @@ function InfoCards(): React.JSX.Element {
   );
 }
 
-function Fab(): React.JSX.Element {
+function Fab({
+  onPick,
+}: {
+  onPick: (source: PickSource) => void;
+}): React.JSX.Element {
   const [open, setOpen] = useState(false);
+
+  const choose = (source: PickSource): void => {
+    setOpen(false);
+    onPick(source);
+  };
 
   return (
     <View style={styles.fabWrap} pointerEvents="box-none">
       {open ? (
         <View style={styles.fabMenu}>
-          <FabMenuItem label="Scan Document" icon="document-scanner" />
-          <FabMenuItem label="Upload PDF" icon="upload-file" />
+          <FabMenuItem
+            label="Scan / Take Photo"
+            icon="document-scanner"
+            onPress={() => choose('camera')}
+          />
+          <FabMenuItem
+            label="Choose from Gallery"
+            icon="upload-file"
+            onPress={() => choose('library')}
+          />
         </View>
       ) : null}
       <Pressable
@@ -256,12 +489,15 @@ function Fab(): React.JSX.Element {
 function FabMenuItem({
   label,
   icon,
+  onPress,
 }: {
   label: string;
   icon: string;
+  onPress: () => void;
 }): React.JSX.Element {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [styles.fabMenuItem, pressed && styles.pressed]}
     >
       <Text style={styles.fabMenuText}>{label}</Text>
@@ -473,4 +709,33 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   fabMenuText: { ...typography.labelCaps, color: c.textPrimary },
+
+  // Form
+  filePreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: c.surfaceAlt,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  filePreviewText: { ...typography.body, color: c.textPrimary, flexShrink: 1 },
+  fieldLabel: { ...typography.labelCaps, fontSize: 11, color: c.textDim, marginBottom: spacing.xs },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surfaceAlt,
+  },
+  chipActive: { backgroundColor: c.accent, borderColor: c.accent },
+  chipText: { ...typography.labelCaps, fontSize: 11, color: c.textDim },
+  chipTextActive: { color: c.onAccent },
 });

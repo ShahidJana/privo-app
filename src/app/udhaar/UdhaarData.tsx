@@ -8,9 +8,14 @@
  * error boundary in UdhaarScreen.
  */
 import React, { useState } from 'react';
+import { Alert } from 'react-native';
 import { now } from '@lib/date';
+import { inputToPaisa } from '@lib/money';
 import {
+  useCreatePerson,
+  useCreateUdhaar,
   usePersonBalances,
+  usePersons,
   useUdhaarList,
 } from '@features/udhaar/useUdhaar';
 import type {
@@ -23,6 +28,8 @@ import {
   type Balance,
   type DetailVM,
   type EntryVM,
+  type NewEntryInput,
+  type NewPersonInput,
   type PersonVM,
 } from './UdhaarView';
 
@@ -121,28 +128,63 @@ export default function UdhaarData({
 }): React.JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const persons = usePersons().data ?? [];
   const balances = usePersonBalances().data ?? [];
   const entries =
     useUdhaarList(selectedId ? { personId: selectedId } : undefined).data ?? [];
+
+  const createPerson = useCreatePerson();
+  const createUdhaar = useCreateUdhaar();
+
+  const handleCreatePerson = (input: NewPersonInput): void => {
+    createPerson.mutate(
+      {
+        name: input.name,
+        phone: input.phone.length > 0 ? input.phone : undefined,
+      },
+      {
+        onError: err =>
+          Alert.alert('Could not add person', String((err as Error)?.message ?? err)),
+      },
+    );
+  };
+
+  const handleCreateEntry = (input: NewEntryInput): void => {
+    if (selectedId === null) {
+      return;
+    }
+    createUdhaar.mutate({
+      personId: selectedId,
+      amount: inputToPaisa(input.amount),
+      direction: input.direction,
+      currency: 'PKR',
+      date: now(),
+      note: input.note.length > 0 ? input.note : undefined,
+    });
+  };
 
   const nowMs = now();
   const netLena = balances.reduce((s, b) => (b.net > 0 ? s + b.net : s), 0);
   const netDena = balances.reduce((s, b) => (b.net < 0 ? s - b.net : s), 0);
 
-  const people = balances
-    .slice()
+  // Every person shows in the list — those without entries net to 0 (SETTLED) —
+  // so a newly added person can be tapped to record their first lena/dena.
+  const netByPerson = new Map(balances.map(b => [b.personId, b.net]));
+  const people = persons
+    .map(p => ({ personId: p.id, name: p.name, net: netByPerson.get(p.id) ?? 0 }))
     .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
     .map(personToVM);
 
-  const selected = selectedId
-    ? balances.find(b => b.personId === selectedId)
+  const selectedPerson = selectedId
+    ? persons.find(p => p.id === selectedId)
     : undefined;
+  const selectedNet = selectedId ? netByPerson.get(selectedId) ?? 0 : 0;
 
-  const detail: DetailVM | null = selected
+  const detail: DetailVM | null = selectedPerson
     ? {
-        name: selected.name,
-        outstandingLabel: formatPkr(selected.net),
-        tone: selected.net > 0 ? 'lena' : selected.net < 0 ? 'dena' : 'normal',
+        name: selectedPerson.name,
+        outstandingLabel: formatPkr(selectedNet),
+        tone: selectedNet > 0 ? 'lena' : selectedNet < 0 ? 'dena' : 'normal',
         entries: entries.map(e => entryToVM(e, nowMs)),
       }
     : null;
@@ -156,6 +198,10 @@ export default function UdhaarData({
       onTabPress={onTabPress}
       onSelectPerson={setSelectedId}
       onBack={() => setSelectedId(null)}
+      onCreatePerson={handleCreatePerson}
+      onCreateEntry={handleCreateEntry}
+      creatingPerson={createPerson.isPending}
+      creatingEntry={createUdhaar.isPending}
     />
   );
 }

@@ -4,7 +4,7 @@
  * cards) and a per-person Details view (transaction list). Imports nothing from
  * the data/native layer; all values arrive pre-formatted from UdhaarData.tsx.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -18,11 +18,27 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@ui/components/Icon';
 import { BottomNav, type TabKey } from '@ui/components/BottomNav';
+import { FormSheet } from '@ui/components/FormSheet';
+import { TextField } from '@ui/components/TextField';
+import { Button } from '@ui/components/Button';
 import { darkTheme as c } from '@ui/theme/colors';
 import { radius, spacing } from '@ui/theme/spacing';
 import { typography } from '@ui/theme/typography';
 
 export type Balance = 'lena' | 'dena' | 'normal';
+
+/** Form payload for a new person (raw strings; Data layer validates/persists). */
+export interface NewPersonInput {
+  name: string;
+  phone: string;
+}
+
+/** Form payload for a new lena/dena entry (raw strings; Data layer converts). */
+export interface NewEntryInput {
+  direction: Exclude<Balance, 'normal'>;
+  amount: string;
+  note: string;
+}
 export type ReturnTone = 'info' | 'danger' | 'normal';
 
 export interface PersonVM {
@@ -82,11 +98,32 @@ export function UdhaarView({
   onTabPress,
   onSelectPerson,
   onBack,
+  onCreatePerson,
+  onCreateEntry,
+  creatingPerson = false,
+  creatingEntry = false,
 }: UdhaarData & {
   onTabPress: (tab: TabKey) => void;
   onSelectPerson: (id: string) => void;
   onBack: () => void;
+  onCreatePerson: (input: NewPersonInput) => void;
+  onCreateEntry: (input: NewEntryInput) => void;
+  creatingPerson?: boolean;
+  creatingEntry?: boolean;
 }): React.JSX.Element {
+  const [personOpen, setPersonOpen] = useState(false);
+  const [entryDirection, setEntryDirection] =
+    useState<Exclude<Balance, 'normal'> | null>(null);
+
+  const submitPerson = (input: NewPersonInput): void => {
+    onCreatePerson(input);
+    setPersonOpen(false);
+  };
+  const submitEntry = (input: NewEntryInput): void => {
+    onCreateEntry(input);
+    setEntryDirection(null);
+  };
+
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.headerWrap}>
@@ -147,14 +184,170 @@ export function UdhaarView({
         </View>
 
         {detail === null ? (
-          <SummaryContent people={people} onSelectPerson={onSelectPerson} />
+          <SummaryContent
+            people={people}
+            onSelectPerson={onSelectPerson}
+            onNewPerson={() => setPersonOpen(true)}
+          />
         ) : (
-          <DetailContent detail={detail} onBack={onBack} />
+          <DetailContent
+            detail={detail}
+            onBack={onBack}
+            onAddEntry={setEntryDirection}
+          />
         )}
       </ScrollView>
 
       <BottomNav active="udhaar" onTabPress={onTabPress} />
+
+      <PersonForm
+        visible={personOpen}
+        busy={creatingPerson}
+        onClose={() => setPersonOpen(false)}
+        onSubmit={submitPerson}
+      />
+      <EntryForm
+        direction={entryDirection}
+        personName={detail?.name ?? ''}
+        busy={creatingEntry}
+        onClose={() => setEntryDirection(null)}
+        onSubmit={submitEntry}
+      />
     </View>
+  );
+}
+
+/* -------------------------------- forms --------------------------------- */
+
+function PersonForm({
+  visible,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (input: NewPersonInput) => void;
+}): React.JSX.Element {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  // Reset fields each time the sheet opens.
+  React.useEffect(() => {
+    if (visible) {
+      setName('');
+      setPhone('');
+      setError(null);
+    }
+  }, [visible]);
+
+  const submit = (): void => {
+    if (name.trim().length === 0) {
+      setError('Name is required');
+      return;
+    }
+    onSubmit({ name: name.trim(), phone: phone.trim() });
+  };
+
+  return (
+    <FormSheet visible={visible} title="New Person" onClose={onClose}>
+      <TextField
+        label="Name"
+        placeholder="e.g. Ahmed Khan"
+        value={name}
+        onChangeText={t => {
+          setName(t);
+          if (error) {
+            setError(null);
+          }
+        }}
+        error={error}
+        autoFocus
+        returnKeyType="next"
+      />
+      <TextField
+        label="Phone (optional)"
+        placeholder="03xx-xxxxxxx"
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
+      />
+      <Button label="Add Person" iconName="person-add" onPress={submit} busy={busy} />
+    </FormSheet>
+  );
+}
+
+function EntryForm({
+  direction,
+  personName,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  direction: Exclude<Balance, 'normal'> | null;
+  personName: string;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (input: NewEntryInput) => void;
+}): React.JSX.Element {
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (direction !== null) {
+      setAmount('');
+      setNote('');
+      setError(null);
+    }
+  }, [direction]);
+
+  const submit = (): void => {
+    if (direction === null) {
+      return;
+    }
+    const value = Number.parseFloat(amount.replace(/[^0-9.]/g, ''));
+    if (!Number.isFinite(value) || value <= 0) {
+      setError('Enter an amount greater than 0');
+      return;
+    }
+    onSubmit({ direction, amount, note: note.trim() });
+  };
+
+  const isLena = direction === 'lena';
+  const title = isLena ? `Lena from ${personName}` : `Dena to ${personName}`;
+
+  return (
+    <FormSheet visible={direction !== null} title={title} onClose={onClose}>
+      <TextField
+        label="Amount (PKR)"
+        placeholder="0"
+        value={amount}
+        onChangeText={t => {
+          setAmount(t);
+          if (error) {
+            setError(null);
+          }
+        }}
+        error={error}
+        keyboardType="decimal-pad"
+        autoFocus
+      />
+      <TextField
+        label="Note (optional)"
+        placeholder={isLena ? 'Money lent' : 'Money borrowed'}
+        value={note}
+        onChangeText={setNote}
+      />
+      <Button
+        label={isLena ? 'Add Lena' : 'Add Dena'}
+        iconName={isLena ? 'add-circle' : 'remove-circle'}
+        onPress={submit}
+        busy={busy}
+      />
+    </FormSheet>
   );
 }
 
@@ -163,9 +356,11 @@ export function UdhaarView({
 function SummaryContent({
   people,
   onSelectPerson,
+  onNewPerson,
 }: {
   people: PersonVM[];
   onSelectPerson: (id: string) => void;
+  onNewPerson: () => void;
 }): React.JSX.Element {
   return (
     <View style={styles.summary}>
@@ -179,6 +374,7 @@ function SummaryContent({
           />
         </View>
         <Pressable
+          onPress={onNewPerson}
           style={({ pressed }) => [styles.newBtn, pressed && styles.pressed]}
         >
           <Icon name="person-add" size={20} color={c.onAccent} />
@@ -250,9 +446,11 @@ function PersonCard({
 function DetailContent({
   detail,
   onBack,
+  onAddEntry,
 }: {
   detail: DetailVM;
   onBack: () => void;
+  onAddEntry: (direction: Exclude<Balance, 'normal'>) => void;
 }): React.JSX.Element {
   return (
     <View style={styles.summary}>
@@ -287,8 +485,18 @@ function DetailContent({
       )}
 
       <View style={styles.actionBar}>
-        <ActionButton label="ADD LENA" icon="add-circle" tone="lena" />
-        <ActionButton label="ADD DENA" icon="remove-circle" tone="dena" />
+        <ActionButton
+          label="ADD LENA"
+          icon="add-circle"
+          tone="lena"
+          onPress={() => onAddEntry('lena')}
+        />
+        <ActionButton
+          label="ADD DENA"
+          icon="remove-circle"
+          tone="dena"
+          onPress={() => onAddEntry('dena')}
+        />
       </View>
     </View>
   );
@@ -345,14 +553,17 @@ function ActionButton({
   label,
   icon,
   tone,
+  onPress,
 }: {
   label: string;
   icon: string;
   tone: Exclude<Balance, 'normal'>;
+  onPress: () => void;
 }): React.JSX.Element {
   const color = balanceColor(tone);
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         styles.actionBtn,
         { borderColor: `${color}55` },

@@ -83,11 +83,19 @@ export function DashboardView({
         <HeroStatus />
 
         <View style={styles.grid}>
-          <DocumentsTile count={docCount} expiring={expiring} />
-          <UdhaarTile owed={owed} owe={owe} />
+          <DocumentsTile
+            count={docCount}
+            expiring={expiring}
+            onPress={() => onTabPress('documents')}
+          />
+          <UdhaarTile
+            owed={owed}
+            owe={owe}
+            onPress={() => onTabPress('udhaar')}
+          />
           <View style={styles.gridRow}>
-            <VaultTile count={vaultCount} />
-            <AddEntryTile />
+            <VaultTile count={vaultCount} onPress={() => onTabPress('vault')} />
+            <AddEntryTile onPress={() => onTabPress('vault')} />
           </View>
         </View>
 
@@ -141,12 +149,15 @@ function HeroStatus(): React.JSX.Element {
 function DocumentsTile({
   count,
   expiring,
+  onPress,
 }: {
   count: number;
   expiring: ExpiringDoc | undefined;
+  onPress: () => void;
 }): React.JSX.Element {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
     >
       <View style={styles.tileHeaderRow}>
@@ -185,12 +196,15 @@ function DocumentsTile({
 function UdhaarTile({
   owed,
   owe,
+  onPress,
 }: {
   owed: number;
   owe: number;
+  onPress: () => void;
 }): React.JSX.Element {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
     >
       <View style={styles.tileTitleRow}>
@@ -221,9 +235,16 @@ function UdhaarTile({
   );
 }
 
-function VaultTile({ count }: { count: number }): React.JSX.Element {
+function VaultTile({
+  count,
+  onPress,
+}: {
+  count: number;
+  onPress: () => void;
+}): React.JSX.Element {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         styles.tile,
         styles.halfTile,
@@ -244,9 +265,10 @@ function VaultTile({ count }: { count: number }): React.JSX.Element {
   );
 }
 
-function AddEntryTile(): React.JSX.Element {
+function AddEntryTile({ onPress }: { onPress: () => void }): React.JSX.Element {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         styles.addTile,
         styles.halfTile,

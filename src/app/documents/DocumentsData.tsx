@@ -8,17 +8,23 @@
  */
 import React from 'react';
 import { now } from '@lib/date';
-import { useDocumentList } from '@features/documents/useDocuments';
+import {
+  useCreateDocument,
+  useDocumentList,
+} from '@features/documents/useDocuments';
 import type {
   DocumentCategory,
   DocumentItem,
   DocumentType,
 } from '@features/documents/documents.types';
+import { pickImage, type PickSource } from '@core/files/filePicker';
+import type { PickedFile } from '@core/files/fileStorage';
 import type { TabKey } from '@ui/components/BottomNav';
 import {
   DocumentsView,
   type DocItemVM,
   type DocSection,
+  type NewDocumentInput,
   type Tone,
 } from './DocumentsView';
 
@@ -121,7 +127,29 @@ export default function DocumentsData({
   onTabPress: (tab: TabKey) => void;
 }): React.JSX.Element {
   const documents = useDocumentList().data ?? [];
+  const createDocument = useCreateDocument();
   const nowMs = now();
+
+  const onPickFile = (source: PickSource): Promise<PickedFile | null> =>
+    pickImage(source);
+
+  const onCreate = (input: NewDocumentInput, file: PickedFile): void => {
+    // 'YYYY-MM-DD' → UTC epoch ms; empty string means lifetime (no expiry).
+    let expiryDate: number | undefined;
+    if (input.expiry.length > 0) {
+      const [y, m, d] = input.expiry.split('-').map(Number);
+      expiryDate = Date.UTC(y, m - 1, d);
+    }
+    createDocument.mutate({
+      input: {
+        title: input.title,
+        category: input.category,
+        docType: input.docType,
+        expiryDate,
+      },
+      file,
+    });
+  };
 
   const sections: DocSection[] = CATEGORY_ORDER.map(category => {
     const items = documents
@@ -140,6 +168,9 @@ export default function DocumentsData({
       sections={sections}
       totalCount={documents.length}
       onTabPress={onTabPress}
+      onPickFile={onPickFile}
+      onCreate={onCreate}
+      creating={createDocument.isPending}
     />
   );
 }
