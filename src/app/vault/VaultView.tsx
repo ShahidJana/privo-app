@@ -71,6 +71,7 @@ export function VaultView({
   onToggleReveal,
   onTabPress,
   onCreateEntry,
+  onLock,
   creating = false,
 }: VaultData & {
   revealedId: string | null;
@@ -79,6 +80,7 @@ export function VaultView({
   onToggleReveal: (id: string) => void;
   onTabPress: (tab: TabKey) => void;
   onCreateEntry: (input: NewVaultInput) => void;
+  onLock?: (() => void) | undefined;
   creating?: boolean;
 }): React.JSX.Element {
   const [formOpen, setFormOpen] = useState(false);
@@ -97,9 +99,10 @@ export function VaultView({
             <Text style={styles.brandText}>Privo</Text>
           </View>
           <Pressable
+            onPress={onLock}
             style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}
           >
-            <Icon name="lock" size={22} color={c.textSecondary} />
+            <Icon name="lock-open" size={22} color={c.accent} />
           </Pressable>
         </View>
       </SafeAreaView>

@@ -26,12 +26,24 @@ export interface ExpiringDoc {
   days: number;
 }
 
+/** A single rendered row in the dashboard security audit log. */
+export interface AuditRowVM {
+  id: string;
+  iconName: string;
+  iconColor: string;
+  accent: string;
+  title: string;
+  desc: string;
+  time: string;
+}
+
 export interface DashboardData {
   owed: number; // paisa, others owe you
   owe: number; // paisa, you owe others
   vaultCount: number;
   docCount: number;
   expiring: ExpiringDoc | undefined;
+  auditLog: AuditRowVM[];
 }
 
 export const EMPTY_DASHBOARD: DashboardData = {
@@ -40,6 +52,7 @@ export const EMPTY_DASHBOARD: DashboardData = {
   vaultCount: 0,
   docCount: 0,
   expiring: undefined,
+  auditLog: [],
 };
 
 /** Group an integer into thousands without relying on Intl (Hermes-safe). */
@@ -49,16 +62,33 @@ function formatPkr(paisa: number): string {
   return `PKR ${grouped}`;
 }
 
+export interface VaultLockProps {
+  /** Whether the vault session is currently locked. */
+  locked: boolean;
+  /** True while a biometric prompt is in flight. */
+  unlocking: boolean;
+  /** Unlock when locked, lock when unlocked. */
+  onToggleLock: () => void;
+  /** Open the Settings screen. */
+  onSettings: () => void;
+}
+
 export function DashboardView({
   owed,
   owe,
   vaultCount,
   docCount,
   expiring,
+  auditLog,
+  locked,
+  unlocking,
+  onToggleLock,
+  onSettings,
   onTabPress,
-}: DashboardData & {
-  onTabPress: (tab: TabKey) => void;
-}): React.JSX.Element {
+}: DashboardData &
+  VaultLockProps & {
+    onTabPress: (tab: TabKey) => void;
+  }): React.JSX.Element {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.headerWrap}>
@@ -68,9 +98,15 @@ export function DashboardView({
             <Text style={styles.brandText}>Privo</Text>
           </View>
           <Pressable
+            onPress={onToggleLock}
+            disabled={unlocking}
             style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
           >
-            <Icon name="lock" size={22} color={c.textSecondary} />
+            <Icon
+              name={locked ? 'lock' : 'lock-open'}
+              size={22}
+              color={locked ? c.textSecondary : c.accent}
+            />
           </Pressable>
         </View>
       </SafeAreaView>
@@ -80,7 +116,12 @@ export function DashboardView({
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <HeroStatus />
+        <HeroStatus
+          locked={locked}
+          unlocking={unlocking}
+          onToggleLock={onToggleLock}
+          onSettings={onSettings}
+        />
 
         <View style={styles.grid}>
           <DocumentsTile
@@ -99,7 +140,7 @@ export function DashboardView({
           </View>
         </View>
 
-        <AuditLog />
+        <AuditLog entries={auditLog} />
       </ScrollView>
 
       <BottomNav active="dashboard" onTabPress={onTabPress} />
@@ -109,29 +150,58 @@ export function DashboardView({
 
 /* ------------------------------- hero ----------------------------------- */
 
-function HeroStatus(): React.JSX.Element {
+function HeroStatus({
+  locked,
+  unlocking,
+  onToggleLock,
+  onSettings,
+}: VaultLockProps): React.JSX.Element {
+  const primaryLabel = unlocking
+    ? 'Unlocking…'
+    : locked
+      ? 'Unlock Vault'
+      : 'Lock Vault';
+
   return (
     <View style={styles.hero}>
       <View style={styles.heroTop}>
         <View style={styles.flex1}>
           <Text style={styles.eyebrow}>SYSTEM INTEGRITY</Text>
           <Text style={styles.heroTitle}>
-            Vault Status: <Text style={styles.heroLocked}>Locked</Text>
+            Vault Status:{' '}
+            <Text style={locked ? styles.heroLocked : styles.heroUnlocked}>
+              {locked ? 'Locked' : 'Unlocked'}
+            </Text>
           </Text>
         </View>
         <View style={styles.heroBadge}>
-          <Icon name="fingerprint" size={30} color={c.accent} />
+          <Icon
+            name={locked ? 'fingerprint' : 'verified-user'}
+            size={30}
+            color={locked ? c.accent : c.success}
+          />
         </View>
       </View>
 
       <View style={styles.heroActions}>
         <Pressable
-          style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
+          onPress={onToggleLock}
+          disabled={unlocking}
+          style={({ pressed }) => [
+            styles.primaryBtn,
+            !locked && styles.lockBtn,
+            (pressed || unlocking) && styles.pressed,
+          ]}
         >
-          <Icon name="vpn-key" size={18} color={c.onAccent} />
-          <Text style={styles.primaryBtnText}>Unlock Vault</Text>
+          <Icon
+            name={locked ? 'vpn-key' : 'lock'}
+            size={18}
+            color={c.onAccent}
+          />
+          <Text style={styles.primaryBtnText}>{primaryLabel}</Text>
         </Pressable>
         <Pressable
+          onPress={onSettings}
           style={({ pressed }) => [
             styles.ghostBtn,
             pressed && { backgroundColor: p.variant },
@@ -283,28 +353,30 @@ function AddEntryTile({ onPress }: { onPress: () => void }): React.JSX.Element {
 
 /* ----------------------------- audit log -------------------------------- */
 
-function AuditLog(): React.JSX.Element {
+function AuditLog({ entries }: { entries: AuditRowVM[] }): React.JSX.Element {
   return (
     <View style={styles.section}>
       <Text style={styles.eyebrow}>SECURITY AUDIT LOG</Text>
-      <View style={styles.gap12}>
-        <AuditRow
-          iconName="history"
-          iconColor={c.textDim}
-          accent={c.accent}
-          title="Vault Accessed"
-          desc="Biometric authentication successful"
-          time="14:22"
-        />
-        <AuditRow
-          iconName="lock-reset"
-          iconColor={c.danger}
-          accent={c.danger}
-          title="Password Attempt"
-          desc="Failed attempt from IP: 192.168.1.1"
-          time="12:05"
-        />
-      </View>
+      {entries.length === 0 ? (
+        <View style={styles.auditEmpty}>
+          <Icon name="history" size={20} color={c.textDim} />
+          <Text style={styles.auditEmptyText}>No security events yet.</Text>
+        </View>
+      ) : (
+        <View style={styles.gap12}>
+          {entries.map(entry => (
+            <AuditRow
+              key={entry.id}
+              iconName={entry.iconName}
+              iconColor={entry.iconColor}
+              accent={entry.accent}
+              title={entry.title}
+              desc={entry.desc}
+              time={entry.time}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -383,6 +455,7 @@ const styles = StyleSheet.create({
   eyebrow: { ...typography.labelCaps, color: c.textDim, marginBottom: spacing.xs },
   heroTitle: { ...typography.displaySm, color: c.textPrimary },
   heroLocked: { color: c.danger },
+  heroUnlocked: { color: c.success },
   heroBadge: {
     width: 64,
     height: 64,
@@ -513,6 +586,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
   },
+  lockBtn: { backgroundColor: c.success },
   primaryBtnText: { ...typography.button, color: c.onAccent, fontWeight: '700' },
   ghostBtn: {
     flex: 1,
@@ -545,4 +619,16 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   auditTime: { ...typography.labelMono, fontSize: 11, color: c.textDim },
+  auditEmpty: {
+    backgroundColor: c.background,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: radius.md,
+    borderStyle: 'dashed',
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  auditEmptyText: { ...typography.caption, color: c.textDim },
 });

@@ -12,6 +12,7 @@ import React, { useState } from 'react';
 import { now } from '@lib/date';
 import { useCreateVault, useVaultList } from '@features/vault/useVault';
 import { useRevealSecret } from '@features/vault/useRevealSecret';
+import { recordAudit } from '@features/audit/useAudit';
 import type {
   VaultCategory,
   VaultEntry,
@@ -62,21 +63,26 @@ function toCardVM(entry: VaultEntry, nowMs: number): VaultCardVM {
 
 export default function VaultData({
   onTabPress,
+  onLock,
 }: {
   onTabPress: (tab: TabKey) => void;
+  onLock: () => void;
 }): React.JSX.Element {
   const entries = useVaultList().data ?? [];
   const createVault = useCreateVault();
   const { revealed, revealedId, isRevealing, reveal, hide } = useRevealSecret();
 
   const handleCreateEntry = (input: NewVaultInput): void => {
-    createVault.mutate({
-      title: input.title,
-      username: input.username.length > 0 ? input.username : undefined,
-      secret: input.secret,
-      category: input.category,
-      url: input.url.length > 0 ? input.url : undefined,
-    });
+    createVault.mutate(
+      {
+        title: input.title,
+        username: input.username.length > 0 ? input.username : undefined,
+        secret: input.secret,
+        category: input.category,
+        url: input.url.length > 0 ? input.url : undefined,
+      },
+      { onSuccess: () => void recordAudit('vault_entry_created', input.title) },
+    );
   };
   // Track which card's reveal is in flight — the hook only exposes `revealedId`
   // once decryption resolves, so we need our own id to show "Decrypting…".
@@ -90,6 +96,8 @@ export default function VaultData({
       hide();
     } else {
       setPendingId(id);
+      const title = cards.find(card => card.id === id)?.title;
+      void recordAudit('secret_revealed', title ?? null);
       void reveal(id);
     }
   };
@@ -103,6 +111,7 @@ export default function VaultData({
       onToggleReveal={onToggleReveal}
       onTabPress={onTabPress}
       onCreateEntry={handleCreateEntry}
+      onLock={onLock}
       creating={createVault.isPending}
     />
   );

@@ -4,6 +4,7 @@ import { DashboardScreen } from '@/app/dashboard/DashboardScreen';
 import { DocumentsScreen } from '@/app/documents/DocumentsScreen';
 import { UdhaarScreen } from '@/app/udhaar/UdhaarScreen';
 import { VaultScreen } from '@/app/vault/VaultScreen';
+import { SettingsScreen } from '@/app/settings/SettingsScreen';
 import { OnboardingSecurityScreen } from '@/app/onboarding/OnboardingSecurityScreen';
 
 export type RootStackParamList = {
@@ -12,6 +13,7 @@ export type RootStackParamList = {
   Documents: undefined;
   Udhaar: undefined;
   Vault: undefined;
+  Settings: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -27,6 +29,7 @@ export function RootNavigator(): React.JSX.Element {
       <Stack.Screen name="Documents" component={DocumentsScreen} />
       <Stack.Screen name="Udhaar" component={UdhaarScreen} />
       <Stack.Screen name="Vault" component={VaultScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
   );
 }

@@ -12,10 +12,12 @@ import { now } from '@lib/date';
 import { createVaultRepo, type VaultRepo } from '@features/vault/VaultRepo';
 import { DocumentsRepo } from '@features/documents/DocumentsRepo';
 import { UdhaarRepo } from '@features/udhaar/UdhaarRepo';
+import { createAuditRepo, type AuditRepo } from '@features/audit/AuditRepo';
 
 let vaultRepo: VaultRepo | null = null;
 let documentsRepo: DocumentsRepo | null = null;
 let udhaarRepo: UdhaarRepo | null = null;
+let auditRepo: AuditRepo | null = null;
 
 export async function getVaultRepo(): Promise<VaultRepo> {
   if (!vaultRepo) {
@@ -45,9 +47,18 @@ export async function getUdhaarRepo(): Promise<UdhaarRepo> {
   return udhaarRepo;
 }
 
+export async function getAuditRepo(): Promise<AuditRepo> {
+  if (!auditRepo) {
+    const db = await getDatabase();
+    auditRepo = createAuditRepo(db);
+  }
+  return auditRepo;
+}
+
 /** Test hook — clears memoized repos so a fresh DB can be injected. */
 export function __resetRepositories(): void {
   vaultRepo = null;
   documentsRepo = null;
   udhaarRepo = null;
+  auditRepo = null;
 }

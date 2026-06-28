@@ -6,6 +6,7 @@
 import type { Scalar, TransactionalExecutor } from '@core/db/types';
 import { logger } from '@lib/logger';
 import { v1Initial } from './v1_initial';
+import { v2AuditLog } from './v2_audit_log';
 
 /** Statement executor handed to a migration (a DB or a transaction). */
 export interface MigrationExecutor {
@@ -21,7 +22,7 @@ export interface Migration {
 
 // Registered migrations in ascending version order. Append new ones here.
 // The circular import with v1_initial is safe: it imports only the `Migration` type.
-export const migrations: readonly Migration[] = [v1Initial];
+export const migrations: readonly Migration[] = [v1Initial, v2AuditLog];
 
 /** Highest version known to this build of the app. */
 export const LATEST_VERSION = migrations.reduce(

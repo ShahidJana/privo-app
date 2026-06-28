@@ -9,9 +9,17 @@
  * "Requiring unknown module" against a stale bundle — so we keep it synchronous.
  */
 import React from 'react';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import { logger } from '@lib/logger';
 import { useTabPress } from '@/app/navigation/useTabPress';
-import { DashboardView, EMPTY_DASHBOARD } from './DashboardView';
+import { useVaultLock } from '@/app/lock/VaultLockProvider';
+import type { RootStackParamList } from '@/app/navigation/RootNavigator';
+import {
+  DashboardView,
+  EMPTY_DASHBOARD,
+  type VaultLockProps,
+} from './DashboardView';
 import DashboardData from './DashboardData';
 
 interface BoundaryProps {
@@ -45,12 +53,34 @@ class DashboardErrorBoundary extends React.Component<
 
 export function DashboardScreen(): React.JSX.Element {
   const onTabPress = useTabPress();
+  const navigation =
+    useNavigation<StackNavigationProp<RootStackParamList>>();
+  const { isUnlocked, unlocking, unlock, lock } = useVaultLock();
+
+  const lockProps: VaultLockProps = {
+    locked: !isUnlocked,
+    unlocking,
+    onToggleLock: () => {
+      if (isUnlocked) {
+        lock();
+      } else {
+        void unlock();
+      }
+    },
+    onSettings: () => navigation.navigate('Settings'),
+  };
 
   return (
     <DashboardErrorBoundary
-      fallback={<DashboardView {...EMPTY_DASHBOARD} onTabPress={onTabPress} />}
+      fallback={
+        <DashboardView
+          {...EMPTY_DASHBOARD}
+          {...lockProps}
+          onTabPress={onTabPress}
+        />
+      }
     >
-      <DashboardData onTabPress={onTabPress} />
+      <DashboardData onTabPress={onTabPress} {...lockProps} />
     </DashboardErrorBoundary>
   );
 }

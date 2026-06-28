@@ -22,6 +22,8 @@ import { Icon } from '@ui/components/Icon';
 import { darkTheme as c, palette as p } from '@ui/theme/colors';
 import { radius, spacing } from '@ui/theme/spacing';
 import { typography } from '@ui/theme/typography';
+import { setPin as persistPin } from '@core/auth/pin';
+import { logger } from '@lib/logger';
 import type { RootStackParamList } from '@/app/navigation/RootNavigator';
 
 type Step = 'intro' | 'pin' | 'biometric' | 'success';
@@ -33,6 +35,14 @@ export function OnboardingSecurityScreen({ navigation }: Props): React.JSX.Eleme
   const [step, setStep] = useState<Step>('intro');
 
   const complete = (): void => navigation.replace('Home');
+
+  // Persist the PIN as soon as it's confirmed so it can be used to unlock later.
+  const handlePinComplete = (pin: string): void => {
+    persistPin(pin).catch(error =>
+      logger.error('Failed to persist onboarding PIN', { error }),
+    );
+    setStep('biometric');
+  };
 
   return (
     <View style={styles.root}>
@@ -49,7 +59,7 @@ export function OnboardingSecurityScreen({ navigation }: Props): React.JSX.Eleme
       <View style={styles.main}>
         <StepFade stepKey={step}>
           {step === 'intro' && <IntroStep onNext={() => setStep('pin')} />}
-          {step === 'pin' && <PinStep onComplete={() => setStep('biometric')} />}
+          {step === 'pin' && <PinStep onComplete={handlePinComplete} />}
           {step === 'biometric' && (
             <BiometricStep onDone={() => setStep('success')} />
           )}
@@ -188,7 +198,11 @@ function IntroStep({ onNext }: { onNext: () => void }): React.JSX.Element {
   );
 }
 
-function PinStep({ onComplete }: { onComplete: () => void }): React.JSX.Element {
+function PinStep({
+  onComplete,
+}: {
+  onComplete: (pin: string) => void;
+}): React.JSX.Element {
   const [pin, setPin] = useState('');
 
   const push = (digit: string): void => {
@@ -198,7 +212,7 @@ function PinStep({ onComplete }: { onComplete: () => void }): React.JSX.Element 
       }
       const next = prev + digit;
       if (next.length === PIN_LENGTH) {
-        setTimeout(onComplete, 450);
+        setTimeout(() => onComplete(next), 450);
       }
       return next;
     });
@@ -322,11 +336,13 @@ function SuccessStep({ onEnter }: { onEnter: () => void }): React.JSX.Element {
           <Text style={styles.engineBadge}>ACTIVE</Text>
         </View>
         <Text style={styles.engineHash}>
-          AES-256-VAULT-PROTOCOL::7a9c8d…f2e10a4b
+          SHA-256-VAULT-PROTOCOL::7a9c8d…f2e10a4b
         </Text>
       </View>
 
-      <PrimaryButton label="Enter Your Vault" onPress={onEnter} />
+      <View style={styles.enterBtnWrap}>
+        <PrimaryButton label="Enter Your Vault" onPress={onEnter} />
+      </View>
     </View>
   );
 }
@@ -376,7 +392,7 @@ const styles = StyleSheet.create({
   successBadge: {
     width: 96,
     height: 96,
-    borderRadius: radius.pill,
+    borderRadius: radius.xl,
     backgroundColor: 'rgba(78,222,163,0.10)',
     borderWidth: 1,
     borderColor: 'rgba(78,222,163,0.20)',
@@ -409,13 +425,14 @@ const styles = StyleSheet.create({
   keypad: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    width: 280,
+    justifyContent: 'center',
+    width: 3 * 72 + 2 * spacing.gutter,
     alignSelf: 'center',
+    columnGap: spacing.gutter,
     rowGap: spacing.gutter,
   },
-  key: { width: 64, height: 64, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  keyBordered: { borderWidth: 1, borderColor: c.border },
+  key: { width: 72, height: 72, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  keyBordered: { borderWidth: 1, borderColor: c.border, backgroundColor: c.surface },
   keyPressed: { backgroundColor: p.variant, transform: [{ scale: 0.92 }] },
   keyText: { ...typography.titleSm, color: c.textPrimary },
 
@@ -458,6 +475,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   engineHash: { ...typography.labelMono, fontSize: 10, color: 'rgba(78,222,163,0.7)', lineHeight: 14 },
+
+  // Enter Your Vault — dashed accent frame around the primary button
+  enterBtnWrap: {
+    width: '100%',
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: 'rgba(78,222,163,0.4)',
+    borderStyle: 'dashed',
+    padding: spacing.xs,
+  },
 
   // Buttons
   primaryBtn: {
